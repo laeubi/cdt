@@ -14,28 +14,29 @@
 package org.eclipse.cdt.utils.spawner;
 
 import java.io.IOException;
+import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SymbolLookup;
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodType;
 
 import org.eclipse.cdt.utils.spawner.Spawner.IChannel;
 import org.eclipse.cdt.utils.spawner.Spawner.UnixChannel;
-
-import jdk.incubator.foreign.CLinker;
-import jdk.incubator.foreign.FunctionDescriptor;
-import jdk.incubator.foreign.MemoryAddress;
-import jdk.incubator.foreign.MemorySegment;
-import jdk.incubator.foreign.ResourceScope;
-import jdk.incubator.foreign.SegmentAllocator;
 
 /**
  * Native interface using Foreign Function & Memory API instead of JNI.
  * This replaces the JNI-based native methods with FFM-based implementations.
  * 
+ * Requires Java 21+ with --enable-preview flag.
+ * 
  * @since 6.5
  */
 class SpawnerNativeInterface {
 
-	private static final CLinker LINKER = CLinker.getInstance();
+	private static final Linker LINKER = Linker.nativeLinker();
+	private static final SymbolLookup STDLIB = LINKER.defaultLookup();
 	private static final MethodHandle killpg;
 	private static final MethodHandle kill;
 	private static final MethodHandle read;
@@ -45,40 +46,31 @@ class SpawnerNativeInterface {
 
 	static {
 		try {
-			// Link to system functions using CLinker.systemLookup()
+			// Link to system functions using Linker.nativeLinker()
 
 			// int killpg(pid_t pgrp, int sig)
-			MemoryAddress killpgAddr = CLinker.systemLookup().lookup("killpg").orElseThrow();
-			killpg = LINKER.downcallHandle(killpgAddr, MethodType.methodType(int.class, int.class, int.class),
-					FunctionDescriptor.of(CLinker.C_INT, CLinker.C_INT, CLinker.C_INT));
+			killpg = LINKER.downcallHandle(STDLIB.find("killpg").orElseThrow(),
+					FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
 
 			// int kill(pid_t pid, int sig)
-			MemoryAddress killAddr = CLinker.systemLookup().lookup("kill").orElseThrow();
-			kill = LINKER.downcallHandle(killAddr, MethodType.methodType(int.class, int.class, int.class),
-					FunctionDescriptor.of(CLinker.C_INT, CLinker.C_INT, CLinker.C_INT));
+			kill = LINKER.downcallHandle(STDLIB.find("kill").orElseThrow(),
+					FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
 
 			// ssize_t read(int fd, void *buf, size_t count)
-			MemoryAddress readAddr = CLinker.systemLookup().lookup("read").orElseThrow();
-			read = LINKER.downcallHandle(readAddr,
-					MethodType.methodType(long.class, int.class, MemoryAddress.class, long.class),
-					FunctionDescriptor.of(CLinker.C_LONG, CLinker.C_INT, CLinker.C_POINTER, CLinker.C_LONG));
+			read = LINKER.downcallHandle(STDLIB.find("read").orElseThrow(), FunctionDescriptor
+					.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
 			// ssize_t write(int fd, const void *buf, size_t count)
-			MemoryAddress writeAddr = CLinker.systemLookup().lookup("write").orElseThrow();
-			write = LINKER.downcallHandle(writeAddr,
-					MethodType.methodType(long.class, int.class, MemoryAddress.class, long.class),
-					FunctionDescriptor.of(CLinker.C_LONG, CLinker.C_INT, CLinker.C_POINTER, CLinker.C_LONG));
+			write = LINKER.downcallHandle(STDLIB.find("write").orElseThrow(), FunctionDescriptor
+					.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
 			// int close(int fd)
-			MemoryAddress closeAddr = CLinker.systemLookup().lookup("close").orElseThrow();
-			close = LINKER.downcallHandle(closeAddr, MethodType.methodType(int.class, int.class),
-					FunctionDescriptor.of(CLinker.C_INT, CLinker.C_INT));
+			close = LINKER.downcallHandle(STDLIB.find("close").orElseThrow(),
+					FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
 
 			// pid_t waitpid(pid_t pid, int *wstatus, int options)
-			MemoryAddress waitpidAddr = CLinker.systemLookup().lookup("waitpid").orElseThrow();
-			waitpid = LINKER.downcallHandle(waitpidAddr,
-					MethodType.methodType(int.class, int.class, MemoryAddress.class, int.class),
-					FunctionDescriptor.of(CLinker.C_INT, CLinker.C_INT, CLinker.C_POINTER, CLinker.C_INT));
+			waitpid = LINKER.downcallHandle(STDLIB.find("waitpid").orElseThrow(), FunctionDescriptor
+					.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 
 		} catch (Exception e) {
 			throw new ExceptionInInitializerError(e);
@@ -111,12 +103,11 @@ class SpawnerNativeInterface {
 	 * @return the exit status of the process
 	 */
 	static int waitFor(int processID) {
-		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-			SegmentAllocator allocator = SegmentAllocator.ofScope(scope);
-			MemorySegment statusPtr = allocator.allocate(CLinker.C_INT);
-			int pid = (int) waitpid.invokeExact(processID, statusPtr.address(), 0);
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment statusPtr = arena.allocate(ValueLayout.JAVA_INT);
+			int pid = (int) waitpid.invokeExact(processID, statusPtr, 0);
 			if (pid == processID) {
-				return statusPtr.get(CLinker.C_INT, 0);
+				return statusPtr.get(ValueLayout.JAVA_INT, 0);
 			}
 			return -1;
 		} catch (Throwable e) {
@@ -139,10 +130,9 @@ class SpawnerNativeInterface {
 		}
 		int fd = ((UnixChannel) channel).fd;
 
-		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-			SegmentAllocator allocator = SegmentAllocator.ofScope(scope);
-			MemorySegment buffer = allocator.allocateArray(CLinker.C_CHAR, len);
-			long bytesRead = (long) read.invokeExact(fd, buffer.address(), (long) len);
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment buffer = arena.allocate(len);
+			long bytesRead = (long) read.invokeExact(fd, buffer, (long) len);
 
 			if (bytesRead == 0) {
 				// EOF
@@ -152,9 +142,7 @@ class SpawnerNativeInterface {
 			}
 
 			// Copy data from native buffer to Java array
-			for (int i = 0; i < bytesRead; i++) {
-				buf[i] = buffer.get(CLinker.C_CHAR, i);
-			}
+			MemorySegment.copy(buffer, ValueLayout.JAVA_BYTE, 0, buf, 0, (int) bytesRead);
 
 			return (int) bytesRead;
 		} catch (IOException e) {
@@ -179,10 +167,9 @@ class SpawnerNativeInterface {
 		}
 		int fd = ((UnixChannel) channel).fd;
 
-		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-			SegmentAllocator allocator = SegmentAllocator.ofScope(scope);
-			MemorySegment buffer = allocator.allocateArray(CLinker.C_CHAR, buf, 0, len);
-			long bytesWritten = (long) write.invokeExact(fd, buffer.address(), (long) len);
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment buffer = arena.allocateFrom(ValueLayout.JAVA_BYTE, buf, 0, len);
+			long bytesWritten = (long) write.invokeExact(fd, buffer, (long) len);
 
 			if (bytesWritten < 0) {
 				throw new IOException("Write error");
