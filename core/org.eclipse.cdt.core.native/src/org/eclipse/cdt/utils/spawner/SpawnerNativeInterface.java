@@ -168,7 +168,9 @@ class SpawnerNativeInterface {
 		int fd = ((UnixChannel) channel).fd;
 
 		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment buffer = arena.allocateFrom(ValueLayout.JAVA_BYTE, buf, 0, len);
+			MemorySegment buffer = arena.allocate(len);
+			// Copy data from Java array to native buffer
+			MemorySegment.copy(buf, 0, buffer, ValueLayout.JAVA_BYTE, 0, len);
 			long bytesWritten = (long) write.invokeExact(fd, buffer, (long) len);
 
 			if (bytesWritten < 0) {
