@@ -114,3 +114,26 @@ JNIEXPORT jint JNICALL Java_org_eclipse_cdt_utils_spawner_SpawnerOutputStream_cl
     int fd = channelToFileDesc(env, channel);
     return close(fd);
 }
+
+// JNA-compatible wrapper functions
+
+int spawner_read(int fd, char *buf, int len) {
+    int status = read(fd, buf, len);
+    if (status == 0) {
+        return -1; // EOF
+    }
+    return status;
+}
+
+int spawner_write(int fd, const char *buf, int len) {
+    return write(fd, buf, len);
+}
+
+int spawner_close(int fd) {
+    return close(fd);
+}
+
+int spawner_available(int fd) {
+    // Not implemented for Unix - return 0 to indicate unsupported
+    return 0;
+}

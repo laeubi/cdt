@@ -532,27 +532,50 @@ public class Spawner extends Process {
 		}
 	}
 
+	private static final SpawnerNative nativeImpl = createNativeImpl();
+
+	private static SpawnerNative createNativeImpl() {
+		try {
+			if (Platform.getOS().equals(Platform.OS_WIN32)) {
+				return new WindowsSpawnerNative();
+			} else {
+				return new UnixSpawnerNative();
+			}
+		} catch (UnsatisfiedLinkError e) {
+			CNativePlugin.log(e);
+			throw e;
+		}
+	}
+
 	/**
 	 * Native method use in normal exec() calls.
 	 */
-	native int exec0(String[] cmdarray, String[] envp, String dir, IChannel[] chan) throws IOException;
+	int exec0(String[] cmdarray, String[] envp, String dir, IChannel[] chan) throws IOException {
+		return nativeImpl.exec0(cmdarray, envp, dir, chan);
+	}
 
 	/**
 	 * Native method use in no redirect meaning to streams will created.
 	 */
-	native int exec1(String[] cmdarray, String[] envp, String dir) throws IOException;
+	int exec1(String[] cmdarray, String[] envp, String dir) throws IOException {
+		return nativeImpl.exec1(cmdarray, envp, dir);
+	}
 
 	/**
 	 * Native method when executing with a terminal emulation.
 	 * @noreference This method is not intended to be referenced by clients.
 	 */
-	public native int exec2(String[] cmdarray, String[] envp, String dir, IChannel[] chan, String slaveName,
-			int masterFD, boolean console) throws IOException;
+	public int exec2(String[] cmdarray, String[] envp, String dir, IChannel[] chan, String slaveName, int masterFD,
+			boolean console) throws IOException {
+		return nativeImpl.exec2(cmdarray, envp, dir, chan, slaveName, masterFD, console);
+	}
 
 	/**
 	 * Native method to drop a signal on the process with pid.
 	 */
-	public native int raise(int processID, int sig);
+	public int raise(int processID, int sig) {
+		return nativeImpl.raise(processID, sig);
+	}
 
 	/**
 	 * @since 6.2
@@ -565,11 +588,12 @@ public class Spawner extends Process {
 	 * Native method to wait(3) for process to terminate.
 	 * @noreference This method is not intended to be referenced by clients.
 	 */
-	public native int waitFor(int processID);
+	public int waitFor(int processID) {
+		return nativeImpl.waitFor(processID);
+	}
 
 	static {
 		try {
-			System.loadLibrary("spawner"); //$NON-NLS-1$
 			configureNativeTrace(Platform.getDebugBoolean(CNativePlugin.PLUGIN_ID + "/debug/spawner"), //$NON-NLS-1$
 					Platform.getDebugBoolean(CNativePlugin.PLUGIN_ID + "/debug/spawner/details"), //$NON-NLS-1$
 					Platform.getDebugBoolean(CNativePlugin.PLUGIN_ID + "/debug/spawner/starter"), //$NON-NLS-1$
@@ -584,8 +608,10 @@ public class Spawner extends Process {
 	/**
 	 * @since 6.0
 	 */
-	private static native void configureNativeTrace(boolean spawner, boolean spawnerDetails, boolean starter,
-			boolean readReport);
+	private static void configureNativeTrace(boolean spawner, boolean spawnerDetails, boolean starter,
+			boolean readReport) {
+		nativeImpl.configureNativeTrace(spawner, spawnerDetails, starter, readReport);
+	}
 
 	/**
 	 * @since 6.0

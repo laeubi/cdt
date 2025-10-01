@@ -243,3 +243,77 @@ JNIEXPORT void JNICALL Java_org_eclipse_cdt_utils_spawner_Spawner_configureNativ
         trace_enabled = true;
     }
 }
+
+// JNA-compatible wrapper functions
+
+int spawner_exec0(char **cmd, char **envp, const char *dir, int *fd0, int *fd1, int *fd2) {
+    if (!fd0 || !fd1 || !fd2) {
+        return -1;
+    }
+
+    int fd[3];
+    if (trace_enabled) {
+        print_array(stderr, "command:", cmd);
+        print_array(stderr, "Envp:", envp);
+        fprintf(stderr, "dirpath: %s\n", dir);
+    }
+
+    pid_t pid = exec0(cmd[0], cmd, envp, dir, fd);
+    if (pid > 0) {
+        *fd0 = fd[0];
+        *fd1 = fd[1];
+        *fd2 = fd[2];
+    }
+    return pid;
+}
+
+int spawner_exec1(char **cmd, char **envp, const char *dir) {
+    if (trace_enabled) {
+        print_array(stderr, "command:", cmd);
+        print_array(stderr, "Envp:", envp);
+        fprintf(stderr, "dirpath: %s\n", dir);
+    }
+
+    return exec0(cmd[0], cmd, envp, dir, NULL);
+}
+
+int spawner_exec2(char **cmd, char **envp, const char *dir, int *fd0, int *fd1, int *fd2,
+                  const char *pts_name, int masterFD, bool console) {
+    if (!fd0 || !fd1 || !fd2) {
+        return -1;
+    }
+
+    int fd[3];
+    if (trace_enabled) {
+        print_array(stderr, "command:", cmd);
+        print_array(stderr, "Envp:", envp);
+        fprintf(stderr, "dirpath: %s\n", dir);
+        fprintf(stderr, "pts_name: %s\n", pts_name);
+    }
+
+    pid_t pid = exec_pty(cmd[0], cmd, envp, dir, fd, pts_name, masterFD, console);
+    if (pid > 0) {
+        *fd0 = fd[0];
+        *fd1 = fd[1];
+        *fd2 = fd[2];
+    }
+    return pid;
+}
+
+int spawner_raise(int pid, int sig) {
+    int status = killpg(pid, sig);
+    if (status == -1) {
+        status = kill(pid, sig);
+    }
+    return status;
+}
+
+int spawner_waitFor(int pid) {
+    return wait0(pid);
+}
+
+void spawner_configureTrace(bool spawner, bool spawnerDetails, bool starter, bool readReport) {
+    if (spawner) {
+        trace_enabled = true;
+    }
+}
