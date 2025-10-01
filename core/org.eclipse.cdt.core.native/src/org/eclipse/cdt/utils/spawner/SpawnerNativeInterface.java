@@ -29,7 +29,7 @@ import org.eclipse.cdt.utils.spawner.Spawner.UnixChannel;
  * Native interface using Foreign Function & Memory API instead of JNI.
  * This replaces the JNI-based native methods with FFM-based implementations.
  * 
- * Requires Java 21+ with --enable-preview flag.
+ * Requires Java 22+ where FFM API is stable (no longer preview).
  * 
  * @since 6.5
  */

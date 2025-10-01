@@ -38,16 +38,17 @@ These functions involve fork, pipe, execve, and PTY manipulation which would req
 
 ### Requirements
 
-- **Java 21+** (required for FFM API preview)
+- **Java 22+** (FFM API is stable, no preview flags needed)
 - **Runtime Flags**:
-  - `--enable-preview` - Enable preview features for FFM API
   - `--enable-native-access=ALL-UNNAMED` - Allow native memory access
+
+**Note**: For Java 21, the FFM API is still in preview and requires the `--enable-preview` flag.
 
 ### API Changes
 
 | Before (JNI) | After (FFM) |
 |--------------|-------------|
-| `jdk.incubator.foreign` (Java 17) | `java.lang.foreign` (Java 21+) |
+| `jdk.incubator.foreign` (Java 17) | `java.lang.foreign` (Java 22+) |
 | `CLinker.getInstance()` | `Linker.nativeLinker()` |
 | `CLinker.systemLookup()` | `Linker.nativeLinker().defaultLookup()` |
 | `ResourceScope` | `Arena` |
@@ -96,16 +97,19 @@ int result = (int) kill.invokeExact(pid, sig);
 
 ### Limitations
 
-1. **Preview Feature**: Requires `--enable-preview` in Java 21
-2. **Native Access Permission**: Requires `--enable-native-access` at runtime
-3. **Platform-Specific**: Currently only implemented for Unix/Linux
-4. **Partial Migration**: Complex exec functions still use JNI
+1. **Native Access Permission**: Requires `--enable-native-access` at runtime
+2. **Platform-Specific**: Currently only implemented for Unix/Linux
+3. **Partial Migration**: Complex exec functions still use JNI
+
+**Java 21 Users**: If using Java 21, the FFM API is in preview and requires the `--enable-preview` flag in addition to the above requirements.
 
 ## Build Configuration
 
 ### Maven Configuration
 
-Added to `pom.xml`:
+For Java 22+, no special compiler arguments are needed as FFM is stable.
+
+For Java 21, you would need to add `--enable-preview`:
 
 ```xml
 <build>
@@ -128,7 +132,7 @@ Added to `pom.xml`:
 Updated `MANIFEST.MF`:
 
 ```
-Bundle-RequiredExecutionEnvironment: JavaSE-21
+Bundle-RequiredExecutionEnvironment: JavaSE-22
 ```
 
 ## Testing
@@ -136,11 +140,14 @@ Bundle-RequiredExecutionEnvironment: JavaSE-21
 To test the FFM implementation:
 
 ```bash
-# Build with Java 21
-export JAVA_HOME=/path/to/java-21
+# Build with Java 22+
+export JAVA_HOME=/path/to/java-22
 mvn clean compile -pl core/org.eclipse.cdt.core.native
 
-# Run with required flags
+# Run with required flags (Java 22+)
+java --enable-native-access=ALL-UNNAMED ...
+
+# For Java 21 (preview):
 java --enable-preview --enable-native-access=ALL-UNNAMED ...
 ```
 
@@ -176,4 +183,6 @@ Current FFM implementation is Unix/Linux only. Windows support would require:
 - [JEP 454: Foreign Function & Memory API (Second Preview)](https://openjdk.org/jeps/454) - Java 21
 - [JEP 442: Foreign Function & Memory API (Third Preview)](https://openjdk.org/jeps/442) - Java 20  
 - [JEP 434: Foreign Function & Memory API (Second Preview)](https://openjdk.org/jeps/434) - Java 19
-- [Foreign Function & Memory API Tutorial](https://docs.oracle.com/en/java/javase/21/core/foreign-function-and-memory-api.html)
+- [JEP 424: Foreign Function & Memory API (Preview)](https://openjdk.org/jeps/424) - Java 19
+- [JEP 454: Foreign Function & Memory API](https://openjdk.org/jeps/454) - **Stable in Java 22**
+- [Foreign Function & Memory API Tutorial](https://docs.oracle.com/en/java/javase/22/core/foreign-function-and-memory-api.html)
