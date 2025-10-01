@@ -71,7 +71,7 @@ public class SpawnerOutputStream extends OutputStream {
 	public void close() throws IOException {
 		if (channel == null)
 			return;
-		int status = close0(channel);
+		int status = SpawnerNativeInterface.close(channel);
 		if (status == -1)
 			throw new IOException("close error"); //$NON-NLS-1$
 		channel = null;
@@ -82,12 +82,8 @@ public class SpawnerOutputStream extends OutputStream {
 		close();
 	}
 
-	private native int write0(IChannel channel, byte[] b, int len) throws IOException;
-
-	private native int close0(IChannel channel);
-
-	static {
-		System.loadLibrary("spawner"); //$NON-NLS-1$
+	private int write0(IChannel channel, byte[] b, int len) throws IOException {
+		return SpawnerNativeInterface.write(channel, b, len);
 	}
 
 }
