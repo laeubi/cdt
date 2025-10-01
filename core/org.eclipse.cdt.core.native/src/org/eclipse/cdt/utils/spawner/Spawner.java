@@ -534,25 +534,34 @@ public class Spawner extends Process {
 
 	/**
 	 * Native method use in normal exec() calls.
+	 * Note: This still uses JNI as it requires complex native interactions.
+	 * TODO: Consider full FFM migration of exec functionality.
 	 */
 	native int exec0(String[] cmdarray, String[] envp, String dir, IChannel[] chan) throws IOException;
 
 	/**
 	 * Native method use in no redirect meaning to streams will created.
+	 * Note: This still uses JNI as it requires complex native interactions.
+	 * TODO: Consider full FFM migration of exec functionality.
 	 */
 	native int exec1(String[] cmdarray, String[] envp, String dir) throws IOException;
 
 	/**
 	 * Native method when executing with a terminal emulation.
+	 * Note: This still uses JNI as it requires complex native interactions.
+	 * TODO: Consider full FFM migration of exec functionality.
 	 * @noreference This method is not intended to be referenced by clients.
 	 */
 	public native int exec2(String[] cmdarray, String[] envp, String dir, IChannel[] chan, String slaveName,
 			int masterFD, boolean console) throws IOException;
 
 	/**
-	 * Native method to drop a signal on the process with pid.
+	 * Send a signal to a process using killpg or kill.
+	 * Migrated to use Foreign Function & Memory API.
 	 */
-	public native int raise(int processID, int sig);
+	public int raise(int processID, int sig) {
+		return SpawnerNativeInterface.raise(processID, sig);
+	}
 
 	/**
 	 * @since 6.2
@@ -562,13 +571,17 @@ public class Spawner extends Process {
 	}
 
 	/**
-	 * Native method to wait(3) for process to terminate.
+	 * Wait for process to terminate.
+	 * Migrated to use Foreign Function & Memory API.
 	 * @noreference This method is not intended to be referenced by clients.
 	 */
-	public native int waitFor(int processID);
+	public int waitFor(int processID) {
+		return SpawnerNativeInterface.waitFor(processID);
+	}
 
 	static {
 		try {
+			// Still need to load spawner library for exec functions (JNI)
 			System.loadLibrary("spawner"); //$NON-NLS-1$
 			configureNativeTrace(Platform.getDebugBoolean(CNativePlugin.PLUGIN_ID + "/debug/spawner"), //$NON-NLS-1$
 					Platform.getDebugBoolean(CNativePlugin.PLUGIN_ID + "/debug/spawner/details"), //$NON-NLS-1$
@@ -582,10 +595,14 @@ public class Spawner extends Process {
 	}
 
 	/**
+	 * Configure native tracing.
+	 * Migrated to use Foreign Function & Memory API (stub implementation).
 	 * @since 6.0
 	 */
-	private static native void configureNativeTrace(boolean spawner, boolean spawnerDetails, boolean starter,
-			boolean readReport);
+	private static void configureNativeTrace(boolean spawner, boolean spawnerDetails, boolean starter,
+			boolean readReport) {
+		SpawnerNativeInterface.configureNativeTrace(spawner, spawnerDetails, starter, readReport);
+	}
 
 	/**
 	 * @since 6.0

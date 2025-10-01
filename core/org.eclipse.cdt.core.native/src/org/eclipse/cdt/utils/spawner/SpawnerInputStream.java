@@ -79,7 +79,7 @@ class SpawnerInputStream extends InputStream {
 	public void close() throws IOException {
 		if (channel == null)
 			return;
-		int status = close0(channel);
+		int status = SpawnerNativeInterface.close(channel);
 		if (status == -1)
 			throw new IOException(Messages.Util_exception_closeError);
 		channel = null;
@@ -90,12 +90,7 @@ class SpawnerInputStream extends InputStream {
 		if (channel == null) {
 			return 0;
 		}
-		try {
-			return available0(channel);
-		} catch (UnsatisfiedLinkError e) {
-			// for those platforms that do not implement available0
-			return super.available();
-		}
+		return SpawnerNativeInterface.available(channel);
 	}
 
 	@Override
@@ -103,14 +98,8 @@ class SpawnerInputStream extends InputStream {
 		close();
 	}
 
-	private native int read0(IChannel channel, byte[] buf, int len) throws IOException;
-
-	private native int close0(IChannel channel) throws IOException;
-
-	private native int available0(IChannel channel) throws IOException;
-
-	static {
-		System.loadLibrary("spawner"); //$NON-NLS-1$
+	private int read0(IChannel channel, byte[] buf, int len) throws IOException {
+		return SpawnerNativeInterface.read(channel, buf, len);
 	}
 
 }
