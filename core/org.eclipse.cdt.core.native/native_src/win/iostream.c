@@ -218,3 +218,73 @@ extern "C"
     }
     return (rc ? GetLastError() : 0);
 }
+
+// JNA-compatible wrapper functions
+
+int spawner_read(long long handle, char *buf, int len) {
+    HANDLE h = (HANDLE)handle;
+    DWORD nBuffOffset = 0;
+    OVERLAPPED overlapped = {0};
+    overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    
+    if (overlapped.hEvent == NULL) {
+        return -1;
+    }
+
+    while (len > nBuffOffset) {
+        DWORD nNumberOfBytesToRead = min(len - nBuffOffset, BUFF_SIZE);
+        DWORD nNumberOfBytesRead;
+        
+        if (!ReadFile(h, buf + nBuffOffset, nNumberOfBytesToRead, &nNumberOfBytesRead, &overlapped)) {
+            if (GetLastError() != ERROR_IO_PENDING) {
+                CloseHandle(overlapped.hEvent);
+                return -1;
+            }
+            if (!GetOverlappedResult(h, &overlapped, &nNumberOfBytesRead, TRUE)) {
+                CloseHandle(overlapped.hEvent);
+                return -1;
+            }
+        }
+        
+        if (nNumberOfBytesRead == 0) {
+            break;
+        }
+        
+        nBuffOffset += nNumberOfBytesRead;
+    }
+    
+    CloseHandle(overlapped.hEvent);
+    return nBuffOffset;
+}
+
+int spawner_write(long long handle, const char *buf, int len) {
+    HANDLE h = (HANDLE)handle;
+    DWORD nBuffOffset = 0;
+
+    while (len > nBuffOffset) {
+        DWORD nNumberOfBytesToWrite = min(len - nBuffOffset, BUFF_SIZE);
+        DWORD nNumberOfBytesWritten;
+        
+        if (0 == WriteFile(h, buf + nBuffOffset, nNumberOfBytesToWrite, &nNumberOfBytesWritten, NULL)) {
+            return -1;
+        }
+        nBuffOffset += nNumberOfBytesWritten;
+    }
+    return 0;
+}
+
+int spawner_close(long long handle) {
+    HANDLE h = (HANDLE)handle;
+    FlushFileBuffers(h);
+    return (CloseHandle(h) ? 0 : -1);
+}
+
+int spawner_available(long long handle) {
+    HANDLE h = (HANDLE)handle;
+    DWORD nAvail = 0;
+
+    if (0 == PeekNamedPipe(h, NULL, 0, NULL, &nAvail, NULL)) {
+        return 0;
+    }
+    return nAvail;
+}

@@ -864,3 +864,48 @@ extern "C"
         enableTraceFor(CDT_TRACE_SPAWNER_READ_REPORT);
     }
 }
+
+// JNA-compatible wrapper functions
+
+int spawner_exec0(wchar_t **cmd, wchar_t **envp, const wchar_t *dir, long long *h0, long long *h1, long long *h2) {
+    // Implementation needed - this is a placeholder
+    // The actual implementation would need to convert the parameters and call the internal exec function
+    return -1;
+}
+
+int spawner_exec1(wchar_t **cmd, wchar_t **envp, const wchar_t *dir) {
+    // Implementation needed - this is a placeholder
+    return -1;
+}
+
+int spawner_exec2(wchar_t **cmd, wchar_t **envp, const wchar_t *dir, long long *h0, long long *h1, long long *h2,
+                  const wchar_t *slaveName, int masterFD, bool console) {
+    // Implementation needed - this is a placeholder
+    return -1;
+}
+
+int spawner_raise(int pid, int sig) {
+    // Call the existing raise function - need to check the signature
+    // This is a simplified placeholder
+    return -1;
+}
+
+int spawner_waitFor(int pid) {
+    // Call the existing waitFor function
+    return -1;
+}
+
+void spawner_configureTrace(bool spawner, bool spawnerDetails, bool starter, bool readReport) {
+    if (spawner) {
+        enableTraceFor(CDT_TRACE_SPAWNER);
+    }
+    if (spawnerDetails) {
+        enableTraceFor(CDT_TRACE_SPAWNER_DETAILS);
+    }
+    if (starter) {
+        enableTraceFor(CDT_TRACE_SPAWNER_STARTER);
+    }
+    if (readReport) {
+        enableTraceFor(CDT_TRACE_SPAWNER_READ_REPORT);
+    }
+}

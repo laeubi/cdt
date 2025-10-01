@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 import org.eclipse.cdt.utils.spawner.Spawner.IChannel;
+import org.eclipse.core.runtime.Platform;
 
 /**
  * @noextend This class is not intended to be subclassed by clients.
@@ -24,6 +25,15 @@ import org.eclipse.cdt.utils.spawner.Spawner.IChannel;
  */
 public class SpawnerOutputStream extends OutputStream {
 	private IChannel channel;
+	private static final StreamNative streamImpl = createStreamImpl();
+
+	private static StreamNative createStreamImpl() {
+		if (Platform.getOS().equals(Platform.OS_WIN32)) {
+			return new WindowsStreamNative();
+		} else {
+			return new UnixStreamNative();
+		}
+	}
 
 	/**
 	 * From a Unix valid file descriptor set a Reader.
@@ -47,8 +57,8 @@ public class SpawnerOutputStream extends OutputStream {
 			return;
 		}
 		byte[] tmpBuf = new byte[len];
-		System.arraycopy(b, off, tmpBuf, off, len);
-		write0(channel, tmpBuf, len);
+		System.arraycopy(b, off, tmpBuf, 0, len);
+		streamImpl.write(channel, tmpBuf, len);
 	}
 
 	/**
@@ -71,7 +81,7 @@ public class SpawnerOutputStream extends OutputStream {
 	public void close() throws IOException {
 		if (channel == null)
 			return;
-		int status = close0(channel);
+		int status = streamImpl.close(channel);
 		if (status == -1)
 			throw new IOException("close error"); //$NON-NLS-1$
 		channel = null;
@@ -81,13 +91,5 @@ public class SpawnerOutputStream extends OutputStream {
 	protected void finalize() throws IOException {
 		close();
 	}
-
-	private native int write0(IChannel channel, byte[] b, int len) throws IOException;
-
-	private native int close0(IChannel channel);
-
-	static {
-		System.loadLibrary("spawner"); //$NON-NLS-1$
-	}
-
 }
+

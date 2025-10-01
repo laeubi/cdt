@@ -19,9 +19,19 @@ import java.io.InputStream;
 
 import org.eclipse.cdt.internal.core.natives.Messages;
 import org.eclipse.cdt.utils.spawner.Spawner.IChannel;
+import org.eclipse.core.runtime.Platform;
 
 class SpawnerInputStream extends InputStream {
 	private IChannel channel;
+	private static final StreamNative streamImpl = createStreamImpl();
+
+	private static StreamNative createStreamImpl() {
+		if (Platform.getOS().equals(Platform.OS_WIN32)) {
+			return new WindowsStreamNative();
+		} else {
+			return new UnixStreamNative();
+		}
+	}
 
 	/**
 	 * From a Unix valid file descriptor set a Reader.
@@ -61,7 +71,7 @@ class SpawnerInputStream extends InputStream {
 		}
 		byte[] tmpBuf = off > 0 ? new byte[len] : buf;
 
-		len = read0(channel, tmpBuf, len);
+		len = streamImpl.read(channel, tmpBuf, len);
 		if (len <= 0)
 			return -1;
 
@@ -79,7 +89,7 @@ class SpawnerInputStream extends InputStream {
 	public void close() throws IOException {
 		if (channel == null)
 			return;
-		int status = close0(channel);
+		int status = streamImpl.close(channel);
 		if (status == -1)
 			throw new IOException(Messages.Util_exception_closeError);
 		channel = null;
@@ -91,7 +101,7 @@ class SpawnerInputStream extends InputStream {
 			return 0;
 		}
 		try {
-			return available0(channel);
+			return streamImpl.available(channel);
 		} catch (UnsatisfiedLinkError e) {
 			// for those platforms that do not implement available0
 			return super.available();
@@ -102,15 +112,5 @@ class SpawnerInputStream extends InputStream {
 	protected void finalize() throws IOException {
 		close();
 	}
-
-	private native int read0(IChannel channel, byte[] buf, int len) throws IOException;
-
-	private native int close0(IChannel channel) throws IOException;
-
-	private native int available0(IChannel channel) throws IOException;
-
-	static {
-		System.loadLibrary("spawner"); //$NON-NLS-1$
-	}
-
 }
+
