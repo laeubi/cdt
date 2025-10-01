@@ -864,3 +864,140 @@ extern "C"
         enableTraceFor(CDT_TRACE_SPAWNER_READ_REPORT);
     }
 }
+
+// JNA-compatible wrapper functions
+
+int spawner_exec0(wchar_t **cmd, wchar_t **envp, const wchar_t *dir, long long *h0, long long *h1, long long *h2) {
+    // TODO: Implementation needed
+    // This should extract the logic from Java_org_eclipse_cdt_utils_spawner_Spawner_exec0
+    // and create channels without JNI dependencies
+    return -1;
+}
+
+int spawner_exec1(wchar_t **cmd, wchar_t **envp, const wchar_t *dir) {
+    // TODO: Implementation needed
+    // This should extract the logic from Java_org_eclipse_cdt_utils_spawner_Spawner_exec1
+    return -1;
+}
+
+int spawner_exec2(wchar_t **cmd, wchar_t **envp, const wchar_t *dir, long long *h0, long long *h1, long long *h2,
+                  const wchar_t *slaveName, int masterFD, bool console) {
+    // TODO: Implementation needed
+    // This should extract the logic from Java_org_eclipse_cdt_utils_spawner_Spawner_exec2
+    return -1;
+}
+
+int spawner_raise(int uid, int signal) {
+    jint ret = 0;
+    HANDLE hProc;
+    pProcInfo_t pCurProcInfo = findProcInfo(uid);
+
+    if (!pCurProcInfo) {
+        if (org_eclipse_cdt_utils_spawner_Spawner_SIG_INT == signal) {
+            return interruptProcess(uid);
+        }
+        return -1;
+    }
+
+    if (isTraceEnabled(CDT_TRACE_SPAWNER)) {
+        cdtTrace(L"Spawner received signal %i for process %i\n", signal, pCurProcInfo->pid);
+    }
+
+    hProc = OpenProcess(SYNCHRONIZE, 0, pCurProcInfo->pid);
+
+    if (!hProc) {
+        return -1;
+    }
+
+    switch (signal) {
+    case org_eclipse_cdt_utils_spawner_Spawner_SIG_NOOP:
+        ret = ((WAIT_TIMEOUT == WaitForSingleObject(hProc, 0)) ? 0 : -1);
+        break;
+    case org_eclipse_cdt_utils_spawner_Spawner_SIG_HUP:
+        ret = 0;
+        break;
+    case org_eclipse_cdt_utils_spawner_Spawner_SIG_TERM:
+        if (isTraceEnabled(CDT_TRACE_SPAWNER)) {
+            cdtTrace(L"Spawner received TERM signal for process %i\n", pCurProcInfo->pid);
+        }
+        SetEvent(pCurProcInfo->eventTerminate.handle);
+        if (isTraceEnabled(CDT_TRACE_SPAWNER)) {
+            cdtTrace(L"Spawner signaled TERM event\n");
+        }
+        ret = 0;
+        break;
+    case org_eclipse_cdt_utils_spawner_Spawner_SIG_KILL:
+        if (isTraceEnabled(CDT_TRACE_SPAWNER)) {
+            cdtTrace(L"Spawner received KILL signal for process %i\n", pCurProcInfo->pid);
+        }
+        SetEvent(pCurProcInfo->eventKill.handle);
+        if (isTraceEnabled(CDT_TRACE_SPAWNER)) {
+            cdtTrace(L"Spawner signaled KILL event\n");
+        }
+        ret = 0;
+        break;
+    case org_eclipse_cdt_utils_spawner_Spawner_SIG_INT:
+        ResetEvent(pCurProcInfo->eventWait.handle);
+        SetEvent(pCurProcInfo->eventBreak.handle);
+        ret = (WaitForSingleObject(pCurProcInfo->eventWait.handle, 100) == WAIT_OBJECT_0);
+        break;
+    case org_eclipse_cdt_utils_spawner_Spawner_SIG_CTRLC:
+        ResetEvent(pCurProcInfo->eventWait.handle);
+        SetEvent(pCurProcInfo->eventCtrlc.handle);
+        ret = (WaitForSingleObject(pCurProcInfo->eventWait.handle, 100) == WAIT_OBJECT_0);
+        break;
+    default:
+        if (isTraceEnabled(CDT_TRACE_SPAWNER)) {
+            cdtTrace(L"Spawner does not support custom signals on Windows\n");
+        }
+        ret = -1;
+        break;
+    }
+
+    CloseHandle(hProc);
+    return ret;
+}
+
+int spawner_waitFor(int uid) {
+    DWORD exit_code = -1;
+    int what = 0;
+    HANDLE hProc;
+    pProcInfo_t pCurProcInfo = findProcInfo(uid);
+
+    if (!pCurProcInfo) {
+        return -1;
+    }
+
+    hProc = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION, 0, pCurProcInfo->pid);
+
+    if (!hProc) {
+        return -1;
+    }
+
+    what = WaitForSingleObject(hProc, INFINITE);
+
+    if (what == WAIT_OBJECT_0) {
+        GetExitCodeProcess(hProc, &exit_code);
+    }
+
+    if (hProc) {
+        CloseHandle(hProc);
+    }
+
+    return exit_code;
+}
+
+void spawner_configureTrace(bool spawner, bool spawnerDetails, bool starter, bool readReport) {
+    if (spawner) {
+        enableTraceFor(CDT_TRACE_SPAWNER);
+    }
+    if (spawnerDetails) {
+        enableTraceFor(CDT_TRACE_SPAWNER_DETAILS);
+    }
+    if (starter) {
+        enableTraceFor(CDT_TRACE_SPAWNER_STARTER);
+    }
+    if (readReport) {
+        enableTraceFor(CDT_TRACE_SPAWNER_READ_REPORT);
+    }
+}
